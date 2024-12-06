@@ -1,0 +1,7 @@
+﻿Pollutant,AVG_time_season,AVG_time_annual,AVG_time_24h,AVG_time_8h
+pm25,,5,15,
+pm10,,15,45,
+o3,60,,,100
+no2,,10,25,
+so2,,,40,
+co,,,4,
