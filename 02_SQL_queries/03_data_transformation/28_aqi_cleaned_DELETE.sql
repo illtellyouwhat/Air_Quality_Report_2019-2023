@@ -1,0 +1,1 @@
+DELETE FROM aqi_cleaned;
