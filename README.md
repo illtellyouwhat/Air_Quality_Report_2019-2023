@@ -1,6 +1,6 @@
 # Air Quality Analysis (2019-2023)
 
-[![AQI Visualization Preview](/images/aqi_viz-ref.png)](https://illtellyouwhat.github.io/Air_Quality_Report_2019-2023/)
+[![AQI Visualization Preview](/images/aqi_viz_ref.png)](https://illtellyouwhat.github.io/Air_Quality_Report_2019-2023/)
 
 **A comprehensive data engineering project demonstrating systematic data cleaning, statistical analysis, and methodical documentation of a complex analytical workflow.**
 
