@@ -1,5 +1,7 @@
 # Air Quality Analysis (2019-2023)
 
+[![AQI Visualization Preview](/images/aqi_viz-ref.png)](https://illtellyouwhat.github.io/Air_Quality_Report_2019-2023/)
+
 **A comprehensive data engineering project demonstrating systematic data cleaning, statistical analysis, and methodical documentation of a complex analytical workflow.**
 
 ---
@@ -78,7 +80,8 @@ Analysis of global air quality data spanning 616 cities across 95 countries, dem
 │   ├── 01_portable_scripts/      # Reusable utilities
 │   └── 02_jupyter_notebooks/     # Analysis documentation
 ├── images/                       # Documentation images
-├── docs/                         # PDF references (EPA standards)
+├── docs/                         # Vizualization html files
+├── references/                   # PDF references (EPA standards)
 ├── README.md                     # This file
 └── DOCUMENTATION.md              # Complete technical walkthrough
 ```
