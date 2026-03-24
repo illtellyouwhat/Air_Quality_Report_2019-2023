@@ -1,6 +1,5 @@
-# Air Quality Analysis Documentation (2019-2023)
-
-**Comprehensive technical walkthrough of data engineering, cleaning, and analysis methodology**
+# Air Quality Analysis Documentation (2019–2023)
+Comprehensive technical walkthrough of data engineering, cleaning, and analysis methodology
 
 ---
 
@@ -19,336 +18,592 @@
   - [Calculated Fields](#calculated-fields)
   - [WHO Guidelines](#who-guidelines)
   - [Data Exploration (2)](#data-exploration-2)
-- [Visualization](#python-script-for-web-app-visualization)
+- [Visualization](#visualization)
   - [Queries Used for Visualization](#queries-used-for-visualization)
 
 ---
 
-# TLDR
+## TLDR
 
-- Dataset downloaded from: https://aqicn.org/data-platform/covid19/ as CSV
-- Research was done to find what relevant sampling and external measures were to be used in analysis
-- Data was loaded into a PostgreSQL database locally
-- Python used to interact with database and Matplotlib was used in a Jupyter Notebook environment to visualize data integrity
+- Dataset downloaded from [aqicn.org](https://aqicn.org/data-platform/covid19/) as CSV
+- Research done to establish relevant sampling and external benchmarks for analysis
+- Data loaded into a PostgreSQL database locally
+- Python used to interact with database; Matplotlib used in Jupyter Notebook to visualize data integrity
 - Fixed misplaced data and dropped unusable data
 - Only cities/years with 75% complete data were used
-- Rolling averages were weighted on the basis of complete data
-- Statistical columns (Z_score, Composite index) were made for use in further data exploration
-- Subsequent data exploration with statistical columns used to further identify unusable data
+- Rolling averages weighted on the basis of data completeness
+- Statistical columns (Z-score, composite index) added for further data exploration
+- Subsequent data exploration with statistical columns used to identify remaining unusable data
 - Converted SQL queries to JSON file for use in web app visualization
 
 ---
-# PREPARATION
-## meta_data 
 
-- Data downloaded from : https://aqicn.org/data-platform/covid19/
-	- Dates span 2015-2023
-	- Countries: 95
-	- Cities: 616
-	- Variables: 24 (9 pollutants, 15 weather)
+## PREPARATION
 
-> [!note]+ meta data from website:
->
->**The data for each major cities is based on the average (median) of several stations. The data set provides min, max, median and standard deviation for each of the air pollutant species (PM2.5,PM10, Ozone ...) as well as meteorological data (Wind, Temperature, ...).**
->
-> - All air pollutant species are converted to the US EPA standard (i.e. no raw concentrations). All dates are UTC based.<br><br>
-> - The count column is the number of samples used for calculating the median and standard deviation.<br><br>
-> - The city-median value is computed per day using all AQI values for available stations<br><br>
-> -  All air pollutant species are converted to the US EPA standard (i.e. no raw concentrations). All dates are UTC based.<br><br>
-> - The count column is the number of samples used for calculating the median and standard deviation.<br><br>
-> - The city-median value is computed per day using all AQI values for available stations
+### Metadata
 
+- Data downloaded from: https://aqicn.org/data-platform/covid19/
+- Dates span 2015–2023
+- Countries: 95
+- Cities: 616
+- Variables: 24 (9 pollutants, 15 weather)
 
->[!note]+ table schemas:
-> aqi: <br>![[00_initial_setup_table_aqi_schema.png]]
+<details>
+<summary><strong>📋 Metadata from website</strong></summary>
 
-## supporting_documentation
+The data for each major cities is based on the average (median) of several stations. The data set provides min, max, median and standard deviation for each of the air pollutant species (PM2.5, PM10, Ozone ...) as well as meteorological data (Wind, Temperature, ...).
 
->[!NOTE]+ Benchmark for minimum sampling: 
->From [Perplexity](Perplexity.png):
-> ![[Min_Sampling.png]]
-> [document referenced](EPA_min_sampling_doc(2).pdf)
+- All air pollutant species are converted to the US EPA standard (i.e. no raw concentrations). All dates are UTC based.
+- The count column is the number of samples used for calculating the median and standard deviation.
+- The city-median value is computed per day using all AQI values for available stations.
 
->[!NOTE]+ Benchmark for complete data:
->From [Chat GPT](Chat_GPT.png):
->![[MIn_Completeness.png]]
->[document referenced](EPA_min_completeness_doc(1).pdf)
+</details>
 
->[!NOTE]+ WHO pollution guidelines:
->From https://www.who.int/news-room/feature-stories/detail/what-are-the-who-air-quality-guidelines
->![[WHO_pollutants_guidlines.png]]
+<details>
+<summary><strong>📊 Table Schema</strong></summary>
 
->[!NOTE]+ Units of measurement for variables:
->![[pollutant units of measure.png]]
->
->![[weather units of measurement.png]]
+![AQI Table Schema](/images/00_initial_setup_table_aqi_schema.png)
 
->[!NOTE]+ maximum weather measurements (from ChatGPT):
->### **1. Dew Point ("dew")**
->
->- **Maximum Value**: Around **35°C (95°F)**
->- **Reason**: Dew point represents the temperature at which air becomes saturated with moisture. High values occur in very humid tropical conditions.
->
->---
->
->### **2. Humidity**
->
->- **Maximum Value**: **100%**
->- **Reason**: Humidity is the measure of water vapor saturation in the air, and 100% represents fully saturated air (e.g., during fog, rain, or extremely humid conditions).
->
->---
->
->### **3. Precipitation**
->
->- **Maximum Value**:
->   - **Daily Total**: Around **2,500 mm (98.4 inches)**
->  - **Reason**: Record daily precipitation events (e.g., tropical cyclones, monsoons) have produced these totals, such as in tropical regions.
- >   - **Hourly Intensity**: Up to **300 mm (11.8 inches)**
->
->---
->
->### **4. Temperature**
->
->- **Maximum Value**: Around **56.7°C (134°F)**
->- **Reason**: The hottest recorded temperature on Earth was measured in Death Valley, USA. Slightly higher values may occur under extreme artificial or isolated conditions.
->
->---
->
->### **5. Wind Direction ("wd")**
->
->- **Maximum Value**: **360 degrees**
->- **Reason**: Wind direction is measured as an azimuthal angle from 0° to 360°, with 360° representing north.
->
->---
->
->### **6. Wind Gust**
->
->- **Maximum Value**: Around **400 km/h (250 mph)**
->- **Reason**: The strongest wind gusts ever recorded are from tornadoes or extreme cyclones. Examples include the 407 km/h gust during Cyclone Olivia (1996).
->
->---
->
->### **7. Wind Speed**
->
->- **Maximum Value**: Around **300 km/h (186 mph)**
->- **Reason**: Sustained wind speeds typically peak during strong tropical cyclones. Higher gusts are possible but are short-lived.
-## work_flow
+</details>
 
-- Files used in repository follow this structure:<br>
-	![[00_workflow_file_structure.png]]<br><br>
+---
 
-- SQL queries loaded into pandas dataframes via psycopg2 for exploration 
+### Supporting Documentation
+
+<details>
+<summary><strong>📏 Benchmark for Minimum Sampling</strong></summary>
+
+From [Perplexity](/images/Perplexity.png):
+
+![Minimum Sampling Requirements](/images/Min_Sampling.png)
+
+[EPA Document Referenced](/docs/EPA_min_sampling_doc(2).pdf)
+
+</details>
+
+<details>
+<summary><strong>✅ Benchmark for Complete Data</strong></summary>
+
+From [Chat GPT](/images/Chat_GPT.png):
+
+![Minimum Completeness Requirements](/images/MIn_Completeness.png)
+
+[EPA Document Referenced](/docs/EPA_min_completeness_doc(1).pdf)
+
+</details>
+
+<details>
+<summary><strong>🌍 WHO Pollution Guidelines</strong></summary>
+
+From https://www.who.int/news-room/feature-stories/detail/what-are-the-who-air-quality-guidelines
+
+![WHO Pollutant Guidelines](/images/WHO_pollutants_guidlines.png)
+
+</details>
+
+<details>
+<summary><strong>📐 Units of Measurement for Variables</strong></summary>
+
+Pollutants:
+
+![Pollutant Units of Measure](/images/pollutant%20units%20of%20measure.png)
+
+Weather:
+
+![Weather Units of Measurement](/images/weather%20units%20of%20measurement.png)
+
+</details>
+
+<details>
+<summary><strong>🌡️ Maximum Weather Measurements (from ChatGPT)</strong></summary>
+
+**1. Dew Point ("dew")**
+- **Maximum Value:** Around 35°C (95°F)
+- **Reason:** Dew point represents the temperature at which air becomes saturated with moisture. High values occur in very humid tropical conditions.
+
+**2. Humidity**
+- **Maximum Value:** 100%
+- **Reason:** 100% represents fully saturated air (e.g., during fog, rain, or extremely humid conditions).
+
+**3. Precipitation**
+- **Maximum Value:**
+  - Daily Total: Around 2,500 mm (98.4 inches)
+  - Hourly Intensity: Up to 300 mm (11.8 inches)
+- **Reason:** Record daily precipitation events (e.g., tropical cyclones, monsoons) have produced these totals in tropical regions.
+
+**4. Temperature**
+- **Maximum Value:** Around 56.7°C (134°F)
+- **Reason:** The hottest recorded temperature on Earth was measured in Death Valley, USA.
+
+**5. Wind Direction ("wd")**
+- **Maximum Value:** 360 degrees
+- **Reason:** Wind direction is measured as an azimuthal angle from 0° to 360°, with 360° representing north.
+
+**6. Wind Gust**
+- **Maximum Value:** Around 400 km/h (250 mph)
+- **Reason:** The strongest wind gusts are from tornadoes or extreme cyclones (e.g., 407 km/h during Cyclone Olivia, 1996).
+
+**7. Wind Speed**
+- **Maximum Value:** Around 300 km/h (186 mph)
+- **Reason:** Sustained wind speeds typically peak during strong tropical cyclones.
+
+</details>
+
+---
+
+### Workflow
+
+Files used in repository follow this structure:
+
+![File Structure](/images/00_workflow_file_structure.png)
+
+- SQL queries loaded into pandas DataFrames via psycopg2 for exploration
 - Seaborn and Matplotlib used to visualize explorations
 - Jupyter notebooks used to document process
-- Tableau used for final visualizations <br><br>
+- Created web app for final visualizations
 
-	![[00_workflow_workflow.png]]
+![Workflow Diagram](/images/00_workflow_workflow.png)
 
+---
 
-# PROCESS
-## initial_setup
+## PROCESS
 
--   Setup new database named in PM25 in potgreSQL with table named 'aqi'  [[01_init_table_from_raw_data]]
-<br>
--  Uploaded CSV files to database from command line using:
-   [[02_Batch_upload_CSV]]
-<br>
-- 'aqi' table schema:
-	![[00_initial_setup_table_aqi_schema.png]]
+### Initial Setup
 
+- Setup new database named PM25 in PostgreSQL with table named `aqi`
 
-## data_exploration (1)
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/0_table_creation/01_init_table_from_raw_data.sql">01_init_table_from_raw_data</a></summary>
 
+Creates the initial PostgreSQL table structure for loading raw CSV data.
 
-- Loaded initial SQL queries into pandas DF and created scatter plots and heat maps to visualize data distribution.
+</details>
 
-	SQL queries:
-	
-	[[03_aqi_date_count_YM]]
-	[[04_aqi_date_count_YMD]]
-	[[05_aqi_variable_count_YM]]
-	[[06_aqi_variable_count_YMD]]
+- Uploaded CSV files to database from command line using:
 
+<details>
+<summary><strong>View Python Script:</strong> <a href="./03_python/01_portable_scripts/02_Batch_upload_CSV.py">02_Batch_upload_CSV</a></summary>
 
-- Notebook: ![[TEMP/aqi_initial_data_overview.html]]
-<br>
-### INSIGHTS 
+Python script for batch uploading CSV files to PostgreSQL database.
 
-#### ⤵️ Missing/Incomplete Data
-- No data for months Q3-4 in 2014-2018 and Q1 2022
-- Less relative data for Q1-2 in 2014-2018 and Q3-4 2023![[01_data_exploration_01_1.png]]
-<br>
- ![[01_data_exploration_01_1.png]]
-<br><br>
-- Data becomes inconsistent after Q2-2023
-<br>
- ![[01_data_exploration_01_2.png]]
-<br><br>
-- There are smaller holes in data of 8 days or less across entire dataset
-<br>
-![[01_data_exploration_01_3.png]]
-<br><br>
-- weather data not collected until 2019
-<br>
-![[01_data_exploration_01_4.png]]
-<br><br>
-#### ⤵️ Misplaced/Unused Data
-- variables wind-speed, and wind-gust appear to have two columns named for each with one set recording Q1 2020 and the other for Q2-4 2020
-<br>
-![[01_data_exploration_01_5.png]]
-<br><br>
-- Columns: 
-	 aqi, pm1, mepaqi, wind speed, uvi, neph, pol, d, psi, wind gust 
-have little or no data
-<br>
-![[01_data_exploration_01_6.png]]
+</details>
 
-#### 🔴 ACTION
-> [!NOTE]+ Cleaning steps:
-> 
-> - Only use data from Q1 2019 - Q2 2023 as it represents the most complete unbroken time series
-> - Drop unused columns for clarity
-> - Interpolate data that is 8 days or less 
-> - Missing Q1 2022 is to large to interpolate, will be marked as incomplete on final analysis
-> - Filter out rows where count is < 18 [[ ## supporting_documentation|Benchmark for minimum sampling]]
-## cleaning
-- Back up table
-[[08_aqi_BACKUP_TABLE]]
-<br>
-- Find/Drop:
-	- duplicate rows
-	[[09_aqi_DELETE_DUPLICATES]]
-	- rows that have NULL values
-	[[10_aqi_CHECK_NULL]]
-	- unused variable values (aqi, pm1, mepaqi, uvi, neph, pol, d, psi) 
-	[[11_aqi_DELETE_UNUSED_variable]]
-	- rows where "count" < 18 ( see: [[ ## supporting_documentation|Benchmark for minimum sampling]])
-	[[12_aqi_DELETE_count_lessthan_18]]
-	- rows that have erroneous data (min = max, min = median, max = median)
-	[[13_aqi_DELETE_erroneous_data]]
-	<br>
-- Fix misplaced variables (wind-speed / wind-gust):
-	- verify any overlapping duplicates between (wind-gust / wind gust)
-	[[14_aqi_FIND_DUPS_wind gust_wind-gust]]
-	- delete the overlapping data from the variable to be moved (wind gust)
-	[[15_aqi_DELETE_overlap_wind gust]]
-	- Move remaining data from wind gust -> wind-gust
-	[[16_aqi_UPDATE_variable_wind gust]]
-	- repeat process for wind speed / wind-speed
-	[[17_aqi_FIND_DUPS_wind speed_wind-speed]]
-	[[18_aqi_DELETE_overlap_wind speed]]
-	[[19_aqi_UPDATE_variable_wind speed]]
-	<br>
-- Find cities that have at least 75% data for the year continuously for years 2019-2023  (see: [[ ## supporting_documentation|Benchmark for complete data]])
-	- Because of the Q1 2022 missing data across all cities the check for continuous data will be split up between 2019-Q4 2021 and Q2 2022-Q2 2023:
-	[[20_aqi_2019-2021_VIEW]]
-	[[21_aqi_2022-2023_VIEW_]]
-	- this query that finds data for all 12 months and at least 270 days is applied to 2019-2021 VIEW and a CSV file is generated to filter out final table for cities with complete data
-	[[22_aqi_2019-2021_cities_with_consecutive_complete_data]]
-	- Query is modified to apply to 2022-2023:
-	[[23_aqi_2022-2023_cities_with_consecutive_complete_data]]
-<br>
-- Two tables are created from the CSV output of the above queries and their intersection is used to create a new table of the cleaned data from 2019-2023:
-[[24_cities_2019-22__2022-23_CREATE_TABLE]]
-[[25_aqi_cleaned_CREATE_TABLE]]
-## interpolation
+`aqi` table schema:
 
-- Loaded contents of aqi_cleaned into pandas DF and used linear interpolation method to fill in only 8 days or less worth of missing data.
-[[26_aqi_cleaned_select_all]]
-<br>
-- Notebook:
-![[25_aqi_2019-23_interpolate.html]]
+![AQI Table Schema](/images/00_initial_setup_table_aqi_schema.png)
 
-- Data is loaded back into aqi_cleaned after being backed up:
-[[27_aqi_cleaned_BACKUP_TABLE]]
+---
 
-# ANALISIS 
-## calculated_fields
+### Data Exploration (1)
 
-- Standard deviation column (SD) was added for easier calculations for Z-score
-[[29_aqi_cleaned_sd_MATERIALIZED_VIEW]]
-<br>
-- A completeness score was calculated as percentage of complete data for each variable by month over all years. This will be used to weight the 30 day rolling average for accuracy.
-[[30_aqi_cleaned_weights_MATERIALIZED_VIEW]]
-<br>
-- A 30 day weighted rolling average was applied to all variables:
-![[WRA formula.png]]
-- This is the sum of (&#949;) the reading for the variable (x) multiplied by the completeness score (w) divided by the sum of the completeness score for 30 days (i)
-[[31_aqi_sd_ra_MATERIALIZED_VIEW]]
-<br>
-- Z scores were calculated for normalization by city and the entire dataset
-- Two scores were made for overall analysis and city specific to avoid losing finer grained data to averaging 
-- ![[Z_score formual.png]]
-- This is the reading for the variable (x) minus the average of the 30 day rolling average (&mu;) divided by the standard deviation of &mu; (&sigma;)
-[[32_aqi_sd_ra_z_MATERIALIZED_VIEW 1]]
+Loaded initial SQL queries into pandas DataFrames and created scatter plots and heat maps to visualize data distribution.
 
-## WHO_guidelines
+SQL queries used:
 
-- a table detailing what the [[ ## supporting_documentation|WHO pollution guidlines]] are for each pollutant was made to join to main table so days that exceed standards can be flagged and quantified:
-[[33_who_guidlines_CREATE_TABLE]]
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/01_data_exploration/03_aqi_date_count_YM.sql">03_aqi_date_count_YM</a></summary>
 
-- The table was then joined to the main table to tally days that exceeded the who's guidelines:
-[[34_aqi_sd_ra_z_who_MATERIALIZED_VIEW]]
+Counts data entries by year and month to identify temporal coverage.
 
-- From that table a magnitude score was calculated to scale how "bad" the pollution is for a given data point.  Both frequency and amplitude of occurrence are taken into consideration as equally important (That is the amount the pollutant exceeds is as important as how many days it exceeds). This is intended to take into account that 10 days where the pollution exceeds the limit by say 1 or 2 points is not as bad as one day where it is 100 points in exceedance. The formula for this is as follows: <br>
-![[magnitude score formula.png]]
-[[35_aqi_sd_ra_z_who_magnitude_MATERIALIZED_VIEW]]
+</details>
 
-## data_exploration (2)
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/01_data_exploration/04_aqi_date_count_YMD.sql">04_aqi_date_count_YMD</a></summary>
 
-- A final look at the data to ensure it's integrity. Because we have Z scores and a magnitude score we can look at outliers to see if there is any remaining data that may have been incorrectly gathered before we create the queries for our final analysis.
+Counts data entries by year, month, and day for detailed temporal analysis.
 
-- For simplicity two final tables are created and unused MATERIALIZED VIEWS\VIEWS\TABLES are dropped 
-[[37_final_tables_DROP_unused]]
+</details>
 
-- A final View of the full table joined with the magnitude table is created:
-[[38_final_tables_combined_MATERIALIZED_VIEW]]
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/01_data_exploration/05_aqi_variable_count_YM.sql">05_aqi_variable_count_YM</a></summary>
 
-- The full contents of that table is loaded into a DF and the 30 day rolling average, Z scores (city & all), and magnitude scores were put into a KDE chart (KDE was chosen over histogram for readability) with each pollutant variable as a facet.  
-[[39_aqi_full_report_find_outliers_pollutants]]
+Counts variable coverage by year and month.
 
-Notebook:
-![[40_aqi_full_report_data_exploration_2.html]]
+</details>
 
-### INSIGHTS
-#### ⤵️Outliers
-- Chart shows that there are sizable discrepancies in the clustering of data for the Z-score and magnitude.  Data will be looked at values above:
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/01_data_exploration/06_aqi_variable_count_YMD.sql">06_aqi_variable_count_YMD</a></summary>
+
+Counts variable coverage by year, month, and day for granular analysis.
+
+</details>
+
+📓 [Data Exploration Notebook (Part 1)](./03_python/02_notebooks/aqi_initial_data_overview.html)
+
+#### Insights
+
+**⤵️ Missing/Incomplete Data**
+
+- No data for Q3–Q4 in 2014–2018 and Q1 2022
+- Less relative data for Q1–Q2 in 2014–2018 and Q3–Q4 2023
+
+![Date Count by Year/Month](/images/01_data_exploration_01_1.png)
+
+- Data becomes inconsistent after Q2 2023
+
+![Variable Count Heatmap](/images/01_data_exploration_01_2.png)
+
+- Smaller holes in data of 8 days or less exist across the entire dataset
+
+![Small Data Gaps](/images/01_data_exploration_01_3.png)
+
+- Weather data not collected until 2019
+
+![Weather Data Availability](/images/01_data_exploration_01_4.png)
+
+**⤵️ Misplaced/Unused Data**
+
+- Variables `wind-speed` and `wind-gust` appear to have two columns each — one recording Q1 2020 and the other Q2–Q4 2020
+
+![Wind Variable Duplication](/images/01_data_exploration_01_5.png)
+
+- Columns `aqi`, `pm1`, `mepaqi`, `wind speed`, `uvi`, `neph`, `pol`, `d`, `psi`, `wind gust` have little or no data
+
+![Sparse Columns](/images/01_data_exploration_01_6.png)
+
+#### 🔴 Action
+
+<details>
+<summary><strong>Cleaning steps decided:</strong></summary>
+
+- Only use data from Q1 2019 – Q2 2023 as it represents the most complete unbroken time series
+- Drop unused columns for clarity
+- Interpolate gaps of 8 days or less
+- Missing Q1 2022 is too large to interpolate — will be marked as incomplete on final analysis
+- Filter out rows where `count` < 18 (see: [Benchmark for Minimum Sampling](#supporting-documentation))
+
+</details>
+
+---
+
+### Cleaning
+
+**Back up table:**
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/08_aqi_BACKUP_TABLE.sql">08_aqi_BACKUP_TABLE</a></summary>
+
+Creates backup of raw aqi table before cleaning operations.
+
+</details>
+
+**Find and drop:**
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/09_aqi_DELETE_DUPLICATES.sql">09_aqi_DELETE_DUPLICATES</a></summary>
+
+Removes duplicate rows from the table.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/10_aqi_CHECK_NULL.sql">10_aqi_CHECK_NULL</a></summary>
+
+Identifies rows with NULL values.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/11_aqi_DELETE_UNUSED_variable.sql">11_aqi_DELETE_UNUSED_variable</a></summary>
+
+Removes unused variable values: aqi, pm1, mepaqi, uvi, neph, pol, d, psi.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/12_aqi_DELETE_count_lessthan_18.sql">12_aqi_DELETE_count_lessthan_18</a></summary>
+
+Removes rows where count < 18 (see: Benchmark for Minimum Sampling).
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/13_aqi_DELETE_erroneous_data.sql">13_aqi_DELETE_erroneous_data</a></summary>
+
+Removes rows where min = max, min = median, or max = median.
+
+</details>
+
+**Fix misplaced variables (wind-speed / wind-gust):**
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/14_aqi_FIND_DUPS_wind_gust_wind-gust.sql">14_aqi_FIND_DUPS_wind gust_wind-gust</a></summary>
+
+Verifies overlapping duplicates between (wind-gust / wind gust).
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/15_aqi_DELETE_overlap_wind_gust.sql">15_aqi_DELETE_overlap_wind gust</a></summary>
+
+Deletes overlapping data from the variable to be moved (wind gust).
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/16_aqi_UPDATE_variable_wind_gust.sql">16_aqi_UPDATE_variable_wind gust</a></summary>
+
+Moves remaining data from wind gust → wind-gust.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/17_aqi_FIND_DUPS_wind_speed_wind-speed.sql">17_aqi_FIND_DUPS_wind speed_wind-speed</a></summary>
+
+Verifies overlapping duplicates between (wind-speed / wind speed).
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/18_aqi_DELETE_overlap_wind_speed.sql">18_aqi_DELETE_overlap_wind speed</a></summary>
+
+Deletes overlapping data from wind speed.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/19_aqi_UPDATE_variable_wind_speed.sql">19_aqi_UPDATE_variable_wind speed</a></summary>
+
+Moves remaining data from wind speed → wind-speed.
+
+</details>
+
+**Find cities with at least 75% continuous data for 2019–2023** (see: [Benchmark for Complete Data](#supporting-documentation)):
+
+Because Q1 2022 data is missing across all cities, the check for continuous data is split between 2019–Q4 2021 and Q2 2022–Q2 2023:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/20_aqi_2019-2021_VIEW.sql">20_aqi_2019-2021_VIEW</a></summary>
+
+Creates view of data for 2019–2021 period.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/21_aqi_2022-2023_VIEW.sql">21_aqi_2022-2023_VIEW_</a></summary>
+
+Creates view of data for 2022–2023 period.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/22_aqi_2019-2021_cities_with_consecutive_complete_data.sql">22_aqi_2019-2021_cities_with_consecutive_complete_data</a></summary>
+
+Finds cities with all 12 months and at least 270 days of data for 2019–2021. Output CSV used to filter final table.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/23_aqi_2022-2023_cities_with_consecutive_complete_data.sql">23_aqi_2022-2023_cities_with_consecutive_complete_data</a></summary>
+
+Same query modified to apply to 2022–2023 period.
+
+</details>
+
+Two tables are created from the CSV output and their intersection used to create the final cleaned table:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/0_table_creation/24_cities_2019-22__2022-23_CREATE_TABLE.sql">24_cities_2019-22__2022-23_CREATE_TABLE</a></summary>
+
+Creates table from intersection of cities with complete data across both periods.
+
+</details>
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/0_table_creation/25_aqi_cleaned_CREATE_TABLE.sql">25_aqi_cleaned_CREATE_TABLE</a></summary>
+
+Creates final cleaned table.
+
+</details>
+
+---
+
+### Interpolation
+
+Loaded contents of `aqi_cleaned` into pandas DataFrame and used linear interpolation to fill in gaps of 8 days or less.
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/26_aqi_cleaned_select_all.sql">26_aqi_cleaned_select_all</a></summary>
+
+Selects all data from cleaned table for interpolation.
+
+</details>
+
+📓 [Interpolation Notebook](./03_python/02_notebooks/25_aqi_2019-23_interpolate.html)
+
+Data loaded back into `aqi_cleaned` after backup:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/27_aqi_cleaned_BACKUP_TABLE.sql">27_aqi_cleaned_BACKUP_TABLE</a></summary>
+
+Creates backup before reloading interpolated data.
+
+</details>
+
+---
+
+## ANALYSIS
+
+### Calculated Fields
+
+Standard deviation column (SD) added for easier Z-score calculations:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/29_aqi_cleaned_sd_MATERIALIZED_VIEW.sql">29_aqi_cleaned_sd_MATERIALIZED_VIEW</a></summary>
+
+Creates materialized view with standard deviation calculations.
+
+</details>
+
+Completeness score calculated as percentage of complete data for each variable by month over all years. Used to weight the 30-day rolling average for accuracy:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/30_aqi_cleaned_weights_MATERIALIZED_VIEW.sql">30_aqi_cleaned_weights_MATERIALIZED_VIEW</a></summary>
+
+Calculates completeness weights for rolling average.
+
+</details>
+
+30-day weighted rolling average applied to all variables:
+
+![Weighted Rolling Average Formula](/images/WRA%20formula.png)
+
+This is the sum of (ε) the reading for the variable (x) multiplied by the completeness score (w) divided by the sum of the completeness score for 30 days (i).
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/31_aqi_sd_ra_MATERIALIZED_VIEW.sql">31_aqi_sd_ra_MATERIALIZED_VIEW</a></summary>
+
+Applies weighted 30-day rolling average to all variables.
+
+</details>
+
+Z-scores calculated for normalization by city and the entire dataset. Two scores were made for overall analysis and city-specific to avoid losing finer-grained data to averaging:
+
+![Z-Score Formula](/images/Z_score%20formual.png)
+
+This is the reading for the variable (x) minus the average of the 30-day rolling average (μ) divided by the standard deviation of μ (σ).
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/32_aqi_sd_ra_z_MATERIALIZED_VIEW 1.sql">32_aqi_sd_ra_z_MATERIALIZED_VIEW 1</a></summary>
+
+Calculates Z-scores for both city-level and dataset-level normalization.
+
+</details>
+
+---
+
+### WHO Guidelines
+
+Table created detailing WHO pollution guidelines for each pollutant:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/0_table_creation/33_who_guidlines_CREATE_TABLE.sql">33_who_guidlines_CREATE_TABLE</a></summary>
+
+Creates table with WHO guideline thresholds for each pollutant.
+
+</details>
+
+Table joined to main table to tally days exceeding WHO guidelines:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/34_aqi_sd_ra_z_who_MATERIALIZED_VIEW.sql">34_aqi_sd_ra_z_who_MATERIALIZED_VIEW</a></summary>
+
+Joins WHO guidelines and flags exceedances.
+
+</details>
+
+Magnitude score calculated to scale how "bad" the pollution is for a given data point. Both frequency and amplitude of occurrence are considered equally important — the amount a pollutant exceeds the limit is as important as how many days it exceeds. This accounts for the fact that 10 days where pollution exceeds by 1–2 points is not as bad as one day where it is 100 points in exceedance:
+
+![Magnitude Score Formula](/images/magnitude%20score%20formula.png)
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/35_aqi_sd_ra_z_who_magnitude_MATERIALIZED_VIEW.sql">35_aqi_sd_ra_z_who_magnitude_MATERIALIZED_VIEW</a></summary>
+
+Calculates composite magnitude score for pollution severity.
+
+</details>
+
+---
+
+### Data Exploration (2)
+
+Final data integrity check using Z-scores and magnitude scores to identify any remaining incorrectly gathered data before creating final analysis queries.
+
+Drop unused views/tables/materialized views:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/37_final_tables_DROP_unused.sql">37_final_tables_DROP_unused</a></summary>
+
+Cleans up intermediate tables and views.
+
+</details>
+
+Create final combined view:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/03_data_transformation/38_final_tables_combined_MATERIALIZED_VIEW.sql">38_final_tables_combined_MATERIALIZED_VIEW</a></summary>
+
+Creates final materialized view joining all calculated fields.
+
+</details>
+
+Load into DataFrame and visualize with KDE charts — 30-day rolling average, Z-scores (city & all), and magnitude scores plotted with each pollutant variable as a facet. KDE chosen over histogram for readability:
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/01_data_exploration/39_aqi_full_report_find_outliers_pollutants.sql">39_aqi_full_report_find_outliers_pollutants</a></summary>
+
+Query for extracting data for outlier visualization.
+
+</details>
+
+📓 [Data Exploration Notebook (Part 2)](./03_python/02_notebooks/40_aqi_full_report_data_exploration_2.html)
+
+#### Insights
+
+**⤵️ Outliers**
+
+Chart shows sizable discrepancies in data clustering for Z-score and magnitude. Data examined at values above:
 - 140 in the 30_day_rolling_avg
 - 6 in z_score_all
 - 4 in z_score_city
 - 150 in magnitude_score
 
- 
--![[Data_Exploration_2_pollutant.png]]
+![Pollutant Data Exploration](/images/Data_Exploration_2_pollutant.png)
 
-- In an effort not to flag valid outliers a scatterplot was made between the magnitude score and Z_scores to further identify abnormalities:
-![[Pollution_outliers.png]]
+Scatterplot created between magnitude score and Z-scores to further identify abnormalities:
 
-- For magnitude_score > 300, 31 rows were found. A high reading of 879 was recorded and repeated from interpolation as the likely cause of the high magnitude score. Further research indicated that there were several forest and urban fires that could validate such a high reading.  Only the subsequent interpolated rows will be dropped (San Luis Potosi PM10 for 2022-08-21 - 28)
-![[magnitude_GT_300.png]]
+![Pollution Outliers Analysis](/images/Pollution_outliers.png)
 
-- For magnitude_score between 160-200 and z_score > 20(all)/4(city) no discernable discrepancies could be identified
+For `magnitude_score` > 300: 31 rows found. A high reading of 879 was recorded and repeated from interpolation as the likely cause. Further research indicated several forest and urban fires could validate such a high reading. Only the subsequent interpolated rows were dropped (San Luis Potosi PM10 for 2022-08-21 – 28).
 
-- The same analysis was done for weather variables and found that z_scores above 2.5 should be investigated as well 
->[!WARNING] (since magnitude_score is irrelevant to the weather variables and 'pressure' has a different scaling only z_scores were used to identify outliers  ): 
+![Magnitude Score > 300](/images/magnitude_GT_300.png)
 
+For `magnitude_score` between 160–200 and `z_score` > 20 (all) / 4 (city): no discernable discrepancies identified.
 
+Weather variable analysis:
 
-![[Data_Exploration_2_weather.png]]
+> ⚠️ **Note:** Since magnitude_score is irrelevant to weather variables and `pressure` has different scaling, only z_scores were used to identify outliers.
 
+![Weather Data Exploration](/images/Data_Exploration_2_weather.png)
 
-- For weather variables with z_score > 2.5 over 10k rows were returned.  These were matched against known maximum recordings [[ ## supporting_documentation|maximum weather measurements ]] and subsequently dropped.
-[[42_aqi_full_report_DELETE_weather_outliers]]
+For weather variables with `z_score` > 2.5: over 10k rows returned. Matched against known maximum recordings (see: [Maximum Weather Measurements](#supporting-documentation)) and subsequently dropped.
+
+<details>
+<summary><strong>View SQL:</strong> <a href="./02_SQL_queries/02_data_cleaning/42_aqi_full_report_DELETE_weather_outliers.sql">42_aqi_full_report_DELETE_weather_outliers</a></summary>
+
+Removes weather outliers based on validated thresholds.
+
+</details>
 
 ---
 
-## Python Script for Web App Visualization
+## VISUALIZATION
 
-Created Python scripts in Jupyter notebook to extract all aggregated data into a static JSON file for the interactive web app visualization.
+Python scripts in Jupyter notebook extract all aggregated data into a static JSON file for the interactive web app visualization.
 
-[📓 JSON Export Notebook](https://github.com/illtellyouwhat/Air_Quality_Report_2019-2023/blob/main/03_python/02_jupyter_notebooks/43_aqi_full_report_xtract_json_for_viz.ipynb)
+📓 [JSON Export Notebook](./03_python/02_notebooks/aqi_json_export.html)
 
-The script aggregates country, city, region, and world-level outputs into `aqi_data.json`, which is committed to the `docs/` folder and served statically via GitHub Pages. Region and world rollups are computed in Python from the query outputs below — no additional SQL is used for those aggregations.
+The script aggregates country, city, region, and world-level outputs into `aqi_data.json`, committed to the `docs/` folder and served statically via GitHub Pages. Region and world rollups are computed in Python from the query outputs below — no additional SQL is used for those aggregations.
 
 ### Queries Used for Visualization
 
@@ -498,4 +753,4 @@ ORDER BY country, city, year, month
 
 ---
 
-**📊 For final visualizations and analysis results, see the project README.**
+📊 For final visualizations and analysis results, see the project [README](./README.md).
