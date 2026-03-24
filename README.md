@@ -112,7 +112,7 @@ The documentation provides:
 - Pandas (data manipulation, interpolation)
 - Matplotlib & Seaborn (exploratory visualization)
 - Jupyter Notebooks (analysis documentation)
-- Tableau (final visualizations)
+- HTML/CSS (final visualizations)
 
 **Database Interaction:**
 - psycopg2 (Python-PostgreSQL connector)
