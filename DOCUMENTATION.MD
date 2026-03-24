@@ -4,22 +4,20 @@ Comprehensive technical walkthrough of data engineering, cleaning, and analysis 
 ---
 
 ## Table of Contents
-- [TLDR](#tldr)
 - [Preparation](#preparation)
-  - [Metadata](#metadata)
-  - [Supporting Documentation](#supporting-documentation)
-  - [Workflow](#workflow)
+  - [Metadata](#meta_data)
+  - [Supporting Documentation](#supporting_documentation)
+  - [Workflow](#work_flow)
 - [Process](#process)
-  - [Initial Setup](#initial-setup)
-  - [Data Exploration (1)](#data-exploration-1)
+  - [Initial Setup](#initial_setup)
+  - [Data Exploration (1)](#data_exploration-1)
   - [Cleaning](#cleaning)
   - [Interpolation](#interpolation)
 - [Analysis](#analysis)
-  - [Calculated Fields](#calculated-fields)
-  - [WHO Guidelines](#who-guidelines)
-  - [Data Exploration (2)](#data-exploration-2)
+  - [Calculated Fields](#calculated_fields)
+  - [WHO Guidelines](#who_guidelines)
+  - [Data Exploration (2)](#data_exploration-2)
 - [Visualization](#visualization)
-  - [Queries Used for Visualization](#queries-used-for-visualization)
 
 ---
 
