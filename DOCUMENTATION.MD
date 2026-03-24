@@ -162,7 +162,7 @@ From https://www.who.int/news-room/feature-stories/detail/what-are-the-who-air-q
 - SQL queries loaded into pandas dataframes via psycopg2 for exploration
 - Seaborn and Matplotlib used to visualize explorations
 - Jupyter notebooks used to document process
-- Tableau used for final visualizations
+- HTML/CSS used for final visualizations
 
   ![workflow](images/00_workflow_workflow.png)
 
